@@ -98,3 +98,43 @@ export async function upsertClaim(claim: OwnedBlock) {
   });
   if (error) throw error;
 }
+
+export type LotTransactionKind = "claim" | "takeover" | "refunded_too_low";
+
+export async function insertLotTransaction(row: {
+  stripeSessionId: string;
+  stripePaymentIntentId?: string | null;
+  blockId: string;
+  taxBlock: number;
+  neighborhoodId: string;
+  neighborhoodName: string;
+  borough?: string;
+  ownerName: string;
+  ownerUrl: string;
+  ownerImage: string;
+  ownerColor: string;
+  amount: number;
+  kind: LotTransactionKind;
+  previousOwnerName?: string | null;
+  previousPrice?: number | null;
+}) {
+  const admin = createAdminClient();
+  const { error } = await admin.from("nycmap_lot_transactions").insert({
+    stripe_session_id: row.stripeSessionId,
+    stripe_payment_intent_id: row.stripePaymentIntentId || null,
+    block_id: row.blockId,
+    tax_block: row.taxBlock,
+    neighborhood_id: row.neighborhoodId,
+    neighborhood_name: row.neighborhoodName,
+    borough: row.borough || "",
+    owner_name: row.ownerName,
+    owner_url: row.ownerUrl,
+    owner_image: row.ownerImage,
+    owner_color: row.ownerColor,
+    amount: row.amount,
+    kind: row.kind,
+    previous_owner_name: row.previousOwnerName || null,
+    previous_price: row.previousPrice ?? null,
+  });
+  if (error) throw error;
+}

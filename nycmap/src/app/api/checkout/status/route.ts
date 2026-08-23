@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listClaims } from "@/lib/claims-store";
+import { unpackLotMetadata } from "@/lib/lots";
 import { getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -13,14 +14,17 @@ export async function GET(request: Request) {
 
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.retrieve(sessionId);
-  const blockId = session.metadata?.block_id ?? "";
+  const lots = unpackLotMetadata(session.metadata ?? undefined);
+  const ids = new Set(lots.map((l) => l.id));
   const claims = await listClaims();
-  const claim = claims.find((c) => c.stripeSessionId === sessionId || (blockId && c.id === blockId));
+  const matched = claims.filter((c) => c.stripeSessionId === sessionId || ids.has(c.id));
+  const claim = matched.find((c) => c.stripeSessionId === sessionId) ?? matched[0] ?? null;
 
   return NextResponse.json({
     status: session.status,
     payment_status: session.payment_status,
-    blockId,
+    blockId: lots[0]?.id ?? "",
+    count: lots.length || matched.length,
     claimed: Boolean(claim && claim.stripeSessionId === sessionId),
     claim: claim?.stripeSessionId === sessionId ? claim : null,
   });

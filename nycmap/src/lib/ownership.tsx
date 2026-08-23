@@ -10,7 +10,14 @@ interface OwnershipContextType {
   getBlockOwner: (blockId: string) => OwnedBlock | undefined;
   getBlocksForNeighborhood: (neighborhoodId: string) => OwnedBlock[];
   getTotalRevenue: () => number;
-  getTopOwners: () => { name: string; count: number; spent: number }[];
+  getTopOwners: () => {
+    name: string;
+    url: string;
+    image: string;
+    color: string;
+    count: number;
+    spent: number;
+  }[];
 }
 
 const OwnershipContext = createContext<OwnershipContextType | null>(null);
@@ -79,14 +86,27 @@ export function OwnershipProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getTopOwners = useCallback(() => {
-    const map = new Map<string, { name: string; count: number; spent: number }>();
+    const map = new Map<
+      string,
+      { name: string; url: string; image: string; color: string; count: number; spent: number }
+    >();
     ownedBlocks.forEach((b) => {
       const e = map.get(b.ownerName);
       if (e) {
         e.count++;
         e.spent += b.price;
+        if (!e.url && b.ownerUrl) e.url = b.ownerUrl;
+        if (!e.image && b.ownerImage) e.image = b.ownerImage;
+        if (!e.color && b.ownerColor) e.color = b.ownerColor;
       } else {
-        map.set(b.ownerName, { name: b.ownerName, count: 1, spent: b.price });
+        map.set(b.ownerName, {
+          name: b.ownerName,
+          url: b.ownerUrl,
+          image: b.ownerImage,
+          color: b.ownerColor,
+          count: 1,
+          spent: b.price,
+        });
       }
     });
     return Array.from(map.values()).sort((a, b) => b.spent - a.spent).slice(0, 10);

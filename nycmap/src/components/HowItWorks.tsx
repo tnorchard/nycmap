@@ -32,27 +32,29 @@ export default function HowItWorks({ open, onClose }: Props) {
         </div>
 
         <p className="mt-4 text-[14px] leading-relaxed text-[#5c574f]">
-          There are {NYC_TAX_BLOCKS.toLocaleString()} official tax blocks in New York City.
-          This map splits them into {TOTAL_BLOCKS.toLocaleString()} lots — one shape, one claim —
-          across all five boroughs. Pick one. Put your name on it. Anyone can take it.
+          There are {NYC_TAX_BLOCKS.toLocaleString()} official tax blocks in the city&apos;s files.
+          We carved them into {TOTAL_BLOCKS.toLocaleString()} digital lots — a board game on New York.
+          A dollar a lot. Five at a time. Your link is a billboard; your photo is the flag.
+          Anyone can steal a lot later for 1.5×. That&apos;s the sport.
         </p>
 
         <ol className="mt-6 space-y-4">
-          <Step n="01" title="Pick a lot" body="Choose a borough, zoom in until streets appear, then tap a single lot. Midtown costs more than Inwood." />
-          <Step n="02" title="Claim it" body="Pay the listed price. Your name, link, and color live on the map." />
-          <Step n="03" title="Defend it" body="Anyone can steal your block by paying 1.5× what you paid. Outbid them back, or let it go." />
+          <Step n="01" title="Assemble a parcel" body="Tap unclaimed lots until you have five. That’s the buy-in. Think Monopoly, except the board is the actual city." />
+          <Step n="02" title="Plant the flag" body="Pay $1 a lot. Your name, link, and picture go on the map. People click through. That’s the whole prize." />
+          <Step n="03" title="Hold the empire" body="Tycoons get hunted. Anyone can take a single lot at 1.5× the last sale. Outbid them — or watch the skyline change hands." />
         </ol>
 
         <p className="mt-6 text-[11px] leading-relaxed text-[#8a847e]">
-          Not affiliated with the City of New York. Blocks are digital souvenirs on this map,
-          not real property. Checkout is billed by SportBusy LLC as NYC MAP.
+          Lots are drawn from public NYC tax-block / DCP data. The geometry is a souvenir, not a survey:
+          lines can drift, lots get merged, industrial tracts get lumpy. This is not real property,
+          not a legal description, and not affiliated with the City of New York. Checkout is billed by SportBusy LLC as NYC MAP.
         </p>
 
         <button
           onClick={onClose}
           className="mt-5 w-full rounded-2xl bg-[#141414] py-3 text-[13px] font-medium text-white transition hover:bg-black"
         >
-          Start looking
+          Go make a little trouble
         </button>
       </div>
     </div>

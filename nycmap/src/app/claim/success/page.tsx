@@ -79,7 +79,7 @@ function SuccessBody() {
           </>
         ) : (
           <>
-            <p className="font-serif text-2xl text-[#141414]">You own this block.</p>
+            <p className="font-serif text-2xl text-[#141414]">You&apos;re on the map.</p>
             {claim ? (
               <p className="mt-2 text-[13px] text-[#6b6560]">
                 {claim.neighborhoodName} · {claim.id} · {formatMoney(claim.price)}

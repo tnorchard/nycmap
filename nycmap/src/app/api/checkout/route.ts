@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
 import { listClaims } from "@/lib/claims-store";
-import { minOutbid } from "@/lib/pricing";
+import { packLotMetadata, type LotPayload } from "@/lib/lots";
+import { bundlePrice, LOT_PRICE, MAX_BUNDLE, MIN_BUNDLE, minOutbid } from "@/lib/pricing";
 import { appBaseUrl, getStripe, integrationIdentifier } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
 type Body = {
-  blockId?: string;
-  taxBlock?: number;
-  neighborhoodId?: string;
-  neighborhoodName?: string;
-  borough?: string;
+  lots?: LotPayload[];
+  kind?: "bundle" | "takeover";
   ownerName?: string;
   ownerUrl?: string;
   ownerImage?: string;
   ownerColor?: string;
   bid?: number;
-  basePrice?: number;
 };
 
 function clip(value: string, max = 450) {
@@ -29,23 +26,23 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as Body;
-  const blockId = (body.blockId ?? "").trim();
+  const lots = Array.isArray(body.lots) ? body.lots : [];
+  const kind = body.kind === "takeover" ? "takeover" : "bundle";
   const ownerName = (body.ownerName ?? "").trim();
   let ownerUrl = (body.ownerUrl ?? "").trim();
   const ownerImage = (body.ownerImage ?? "").trim();
   const ownerColor = (body.ownerColor ?? "#141414").trim();
   const bid = Number(body.bid);
-  const basePrice = Number(body.basePrice);
-  const neighborhoodId = (body.neighborhoodId ?? "").trim();
-  const neighborhoodName = (body.neighborhoodName ?? "").trim();
-  const taxBlock = Number(body.taxBlock);
-  const borough = (body.borough ?? "").trim();
 
-  if (!blockId || !ownerName || !ownerUrl || !Number.isFinite(bid) || bid < 1) {
+  if (!lots.length || !ownerName || !ownerUrl || !Number.isFinite(bid) || bid < LOT_PRICE) {
     return NextResponse.json({ error: "Missing claim details" }, { status: 400 });
   }
-  if (!Number.isFinite(basePrice) || basePrice < 1) {
-    return NextResponse.json({ error: "Invalid base price" }, { status: 400 });
+  if (lots.length > MAX_BUNDLE) {
+    return NextResponse.json({ error: `At most ${MAX_BUNDLE} lots per checkout` }, { status: 400 });
+  }
+  const ids = new Set(lots.map((l) => l.id));
+  if (ids.size !== lots.length || lots.some((l) => !l.id)) {
+    return NextResponse.json({ error: "Duplicate or invalid lots" }, { status: 400 });
   }
 
   if (!ownerUrl.startsWith("http://") && !ownerUrl.startsWith("https://")) {
@@ -53,74 +50,99 @@ export async function POST(request: Request) {
   }
 
   const claims = await listClaims();
-  const current = claims.find((c) => c.id === blockId);
-  const min = current ? minOutbid(current.price) : basePrice;
-  if (bid < min) {
-    return NextResponse.json({ error: `Bid must be at least $${min}` }, { status: 409 });
+  const owned = new Set(claims.map((c) => c.id));
+
+  if (kind === "bundle") {
+    if (lots.length < MIN_BUNDLE) {
+      return NextResponse.json(
+        { error: `Claim at least ${MIN_BUNDLE} unclaimed lots together` },
+        { status: 400 }
+      );
+    }
+    if (lots.some((l) => owned.has(l.id))) {
+      return NextResponse.json({ error: "One of those lots is already claimed" }, { status: 409 });
+    }
+    const min = bundlePrice(lots.length);
+    if (bid < min) {
+      return NextResponse.json({ error: `Bid must be at least $${min}` }, { status: 409 });
+    }
+  } else {
+    if (lots.length !== 1) {
+      return NextResponse.json({ error: "Takeovers are one lot at a time" }, { status: 400 });
+    }
+    const current = claims.find((c) => c.id === lots[0].id);
+    if (!current) {
+      return NextResponse.json({ error: "That lot is unclaimed — group 5 open lots instead" }, { status: 409 });
+    }
+    const min = minOutbid(current.price);
+    if (bid < min) {
+      return NextResponse.json({ error: `Bid must be at least $${min}` }, { status: 409 });
+    }
   }
 
   const amountCents = Math.round(bid * 100);
   const origin = appBaseUrl();
-  const label = current ? "Takeover" : "Claim";
-  const place = [neighborhoodName, borough].filter(Boolean).join(", ");
+  const label = kind === "takeover" ? "Takeover" : "Claim";
+  const first = lots[0];
+  const place = [first.neighborhoodName, first.borough].filter(Boolean).join(", ");
   const stripe = getStripe();
+  const packed = packLotMetadata(lots, kind);
 
   let session;
   try {
     session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    success_url: `${origin}/claim/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/?checkout=canceled`,
-    client_reference_id: blockId,
-    allow_promotion_codes: true,
-    branding_settings: {
-      display_name: "NYC Map",
-    },
-    integration_identifier: integrationIdentifier("nycmap_lot"),
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: amountCents,
-          product_data: {
-            name: "NYC Map lot claim",
-            description: `Digital souvenir — ${label} lot ${blockId}. Not real NYC property.`,
-            metadata: {
-              app: "nycmap",
-              product: "lot_claim",
+      mode: "payment",
+      success_url: `${origin}/claim/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/?checkout=canceled`,
+      client_reference_id: lots[0].id.slice(0, 200),
+      allow_promotion_codes: true,
+      branding_settings: {
+        display_name: "NYC Map",
+      },
+      integration_identifier: integrationIdentifier("nycmap_lot"),
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: amountCents,
+            product_data: {
+              name: kind === "bundle" ? `NYC Map · ${lots.length} lots` : "NYC Map lot takeover",
+              description:
+                kind === "bundle"
+                  ? `Digital souvenir — claim ${lots.length} lots at $${LOT_PRICE} each. Not real NYC property.`
+                  : `Digital souvenir — takeover lot ${lots[0].id}. Not real NYC property.`,
+              metadata: {
+                app: "nycmap",
+                product: kind === "bundle" ? "lot_bundle" : "lot_takeover",
+              },
             },
           },
         },
+      ],
+      custom_text: {
+        submit: {
+          message: `${label} ${place ? `${place} ` : ""}${lots.length === 1 ? `lot ${lots[0].id}` : `${lots.length} lots`}. Digital souvenir — not real NYC property. Charged by SportBusy LLC.`,
+        },
       },
-    ],
-    custom_text: {
-      submit: {
-        message: `${label} ${place ? `${place} ` : ""}lot ${blockId}. Digital souvenir — not real NYC property. Charged by SportBusy LLC.`,
+      payment_intent_data: {
+        statement_descriptor_suffix: "NYC MAP",
+        description: `${label} ${lots.length} lot${lots.length === 1 ? "" : "s"}`,
+        metadata: {
+          app: "nycmap",
+          kind,
+          block_ids: packed.block_ids,
+        },
       },
-    },
-    payment_intent_data: {
-      statement_descriptor_suffix: "NYC MAP",
-      description: `${label} ${blockId}`,
       metadata: {
-        app: "nycmap",
-        block_id: blockId,
+        ...packed,
+        owner_name: clip(ownerName, 80),
+        owner_url: clip(ownerUrl),
+        owner_image: clip(ownerImage),
+        owner_color: clip(ownerColor, 20),
+        bid: String(bid),
       },
-    },
-    metadata: {
-      app: "nycmap",
-      block_id: clip(blockId, 80),
-      tax_block: String(Number.isFinite(taxBlock) ? taxBlock : 0),
-      neighborhood_id: clip(neighborhoodId, 80),
-      neighborhood_name: clip(neighborhoodName, 120),
-      borough: clip(borough, 40),
-      owner_name: clip(ownerName, 80),
-      owner_url: clip(ownerUrl),
-      owner_image: clip(ownerImage),
-      owner_color: clip(ownerColor, 20),
-      base_price: String(basePrice),
-    },
-  });
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Checkout failed";
     console.error("Stripe checkout session failed:", err);

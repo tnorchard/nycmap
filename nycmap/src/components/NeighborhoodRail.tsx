@@ -2,7 +2,6 @@
 
 import { NEIGHBORHOODS } from "@/data/neighborhoods";
 import { BoroughId } from "@/data/neighborhoods";
-import { formatMoney } from "@/lib/pricing";
 
 interface Props {
   borough: BoroughId;
@@ -24,7 +23,7 @@ export default function NeighborhoodRail({ borough, onPick }: Props) {
             >
               <p className="text-[12px] font-medium text-[#141414]">{n.name}</p>
               <p className="text-[10px] text-[#8a847e]">
-                {n.blockCount} lots · {formatMoney(n.pricePerBlock)}
+                {n.blockCount} lots · $1 each
               </p>
             </button>
           ))}

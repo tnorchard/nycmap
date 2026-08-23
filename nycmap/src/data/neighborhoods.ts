@@ -2,10 +2,10 @@ import { Neighborhood } from "@/types";
 
 export const BOROUGHS = [
   { id: "manhattan", name: "Manhattan", center: [40.783, -73.971] as [number, number], zoom: 12 },
-  { id: "brooklyn", name: "Brooklyn", center: [40.6782, -73.9442] as [number, number], zoom: 12 },
-  { id: "queens", name: "Queens", center: [40.7282, -73.7949] as [number, number], zoom: 11 },
-  { id: "bronx", name: "Bronx", center: [40.8448, -73.8648] as [number, number], zoom: 12 },
-  { id: "staten-island", name: "Staten Island", center: [40.5795, -74.1502] as [number, number], zoom: 12 },
+  { id: "brooklyn", name: "Brooklyn", center: [40.65, -73.95] as [number, number], zoom: 12 },
+  { id: "queens", name: "Queens", center: [40.72, -73.82] as [number, number], zoom: 11 },
+  { id: "bronx", name: "Bronx", center: [40.85, -73.866] as [number, number], zoom: 12 },
+  { id: "staten-island", name: "Staten Island", center: [40.58, -74.15] as [number, number], zoom: 11 },
 ] as const;
 
 export type BoroughId = (typeof BOROUGHS)[number]["id"];
