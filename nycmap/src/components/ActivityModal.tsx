@@ -49,7 +49,7 @@ export default function ActivityModal({
             <p className="text-[10px] uppercase tracking-[0.18em] text-[#8a847e]">City activity</p>
             <h2 className="font-serif mt-1 text-3xl text-[#141414] sm:text-4xl">Who owns New York</h2>
             <p className="mt-1 max-w-xl text-[13px] leading-snug text-[#6b6560]">
-              Mayors hold a neighborhood. Tycoons stack the most loot citywide. A claim is a billboard —
+              Mayors hold a neighborhood. Tycoons rank by total property value citywide. A claim is a billboard —
               tap a name, send them traffic.
             </p>
             <p className="mt-2 text-[12px] text-[#6b6560]">

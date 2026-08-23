@@ -111,7 +111,7 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                       ) : null}
                       <span className={active ? "text-white/70" : "text-[#8a847e]"}>
                         {" "}
-                        · {formatMoney(o.spent)}
+                        · {formatMoney(o.spent)} property value
                       </span>
                     </span>
                     <button

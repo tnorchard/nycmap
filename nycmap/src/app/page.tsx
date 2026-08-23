@@ -130,7 +130,14 @@ function HomeInner() {
         borough={borough}
         onBoroughChange={onBoroughChange}
         onHowItWorks={() => setHow(true)}
-        onActivity={() => setActivity(true)}
+        onStats={() => {
+          setActivityTab("tycoons");
+          setActivity(true);
+        }}
+        onActivity={() => {
+          setActivityTab("mayors");
+          setActivity(true);
+        }}
         online={online}
         visitors={visitors}
       />

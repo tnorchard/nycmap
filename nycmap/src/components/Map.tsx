@@ -184,18 +184,28 @@ function ViewBounds({ onBounds }: { onBounds: (bounds: L.LatLngBounds) => void }
   return null;
 }
 
-function HoodBorders({ ntas }: { ntas: NtaFC | null }) {
+function HoodBorders({
+  ntas,
+  mayors,
+}: {
+  ntas: NtaFC | null;
+  mayors: Record<string, NeighborhoodMayor>;
+}) {
   if (!ntas) return null;
   return (
     <GeoJSON
       data={ntas as never}
       interactive={false}
-      style={{
-        fill: false,
-        fillOpacity: 0,
-        color: "#141414",
-        weight: 2.4,
-        opacity: 0.95,
+      style={(feature) => {
+        const id = feature?.properties?.id as string | undefined;
+        const mayor = id ? mayors[id] : undefined;
+        return {
+          fill: false,
+          fillOpacity: 0,
+          color: mayor?.color || "#141414",
+          weight: mayor ? 3.2 : 2.4,
+          opacity: mayor ? 0.9 : 0.95,
+        };
       }}
     />
   );
@@ -502,6 +512,17 @@ export default function Map({
       if (!feature?.properties) return {};
       const owned = getBlocksForNeighborhood(feature.properties.id).length;
       const isPark = feature.properties.type === "park";
+      const mayor = mayors[feature.properties.id];
+      if (mayor && !isPark) {
+        return {
+          fillColor: mayor.color || "#ddd0b8",
+          fillOpacity: showBlocks ? 0.18 : 0.36,
+          color: mayor.color || "#141414",
+          weight: showBlocks ? 0 : 1.6,
+          opacity: showBlocks ? 0 : 0.88,
+          interactive: !showBlocks,
+        };
+      }
       return {
         fillColor: isPark ? "#e7efe4" : priceFill(feature.properties.price),
         fillOpacity: showBlocks ? 0.03 : owned > 0 ? 0.58 : 0.42,
@@ -511,7 +532,7 @@ export default function Map({
         interactive: !showBlocks,
       };
     },
-    [getBlocksForNeighborhood, showBlocks]
+    [getBlocksForNeighborhood, mayors, showBlocks]
   );
 
   const paintBlock = useCallback(
@@ -662,7 +683,7 @@ export default function Map({
             data={ntas as never}
             style={ntaStyle}
             onEachFeature={onEachNta}
-            key={`nta-${showBlocks ? "z" : "o"}`}
+            key={`nta-${showBlocks ? "z" : "o"}-m${Object.keys(mayors).length}`}
           />
         )}
 
@@ -677,7 +698,7 @@ export default function Map({
             key={`blocks-${highlightOwner ?? "none"}-${showBlocks ? boundsKey : "h"}`}
           />
         )}
-        {showBlocks ? <HoodBorders ntas={ntas} /> : null}
+        {showBlocks ? <HoodBorders ntas={ntas} mayors={mayors} /> : null}
       </MapContainer>
 
       {hover && showBlocks && (

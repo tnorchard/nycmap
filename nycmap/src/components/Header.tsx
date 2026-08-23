@@ -8,6 +8,7 @@ interface HeaderProps {
   borough: BoroughId;
   onBoroughChange: (id: BoroughId) => void;
   onHowItWorks: () => void;
+  onStats: () => void;
   onActivity: () => void;
   online: number;
   visitors: number;
@@ -17,6 +18,7 @@ export default function Header({
   borough,
   onBoroughChange,
   onHowItWorks,
+  onStats,
   onActivity,
   online,
   visitors,
@@ -66,10 +68,10 @@ export default function Header({
             </button>
             <button
               type="button"
-              onClick={onActivity}
+              onClick={onStats}
               className="rounded-2xl border border-[#e4e0d8] bg-white px-3.5 py-2.5 text-[12px] font-medium text-[#141414] shadow-sm transition hover:bg-[#f6f4ef]"
             >
-              Tycoons
+              Stats
             </button>
             <button
               type="button"
@@ -78,14 +80,6 @@ export default function Header({
             >
               About
             </button>
-            <a
-              href="https://x.com/dullylamb"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden rounded-2xl border border-[#e4e0d8] bg-white px-3.5 py-2.5 text-[12px] font-medium text-[#141414] shadow-sm transition hover:bg-[#f6f4ef] sm:inline-flex"
-            >
-              @dullylamb
-            </a>
           </div>
         </div>
 
