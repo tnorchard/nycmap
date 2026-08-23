@@ -38,3 +38,6 @@ end;
 $$;
 
 grant execute on function nycmap_register_visitor(text) to service_role;
+grant all on table nycmap_visitors to service_role;
+
+notify pgrst, 'reload schema';

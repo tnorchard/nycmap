@@ -16,7 +16,7 @@ function visitorId() {
 }
 
 export function usePresence() {
-  const [online, setOnline] = useState(1);
+  const [online, setOnline] = useState(0);
   const [visitors, setVisitors] = useState(0);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function usePresence() {
         });
         const data = (await res.json()) as { online?: number; visitors?: number; error?: string };
         if (cancelled || !res.ok || data.error) return;
-        if (typeof data.online === "number") setOnline(Math.max(1, data.online));
+        if (typeof data.online === "number") setOnline(data.online);
         if (typeof data.visitors === "number") setVisitors(data.visitors);
       } catch {
         /* keep last known counts */
