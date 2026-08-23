@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useOwnership } from "@/lib/ownership";
 import { formatMoney } from "@/lib/pricing";
-import { OwnerAvatar, OwnerLink } from "@/components/OwnerMark";
+import { hrefFor } from "@/lib/owner-display";
+import { OwnerAvatar } from "@/components/OwnerMark";
 import type { ActivityTab } from "@/components/ActivityModal";
 
 interface Props {
@@ -63,23 +64,26 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                 return (
                   <li
                     key={m.neighborhoodId}
-                    className={`flex items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelectOwner(active ? null : m.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectOwner(active ? null : m.name);
+                      }
+                    }}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
                   >
                     <OwnerAvatar name={m.name} image={m.image} color={m.color} url={m.url} size={22} />
                     <span className="min-w-0 flex-1 truncate text-[10px] sm:text-[11px]">
                       <span className="font-medium">{m.neighborhoodName}</span>
-                      <span className={active ? "text-white/70" : "text-[#8a847e]"}>
-                        {" "}
-                        · {m.url ? <OwnerLink url={m.url} name={m.name} className={active ? "text-white" : "text-[#6b6560]"} /> : m.name}
-                      </span>
+                      <span className={active ? "text-white/70" : "text-[#8a847e]"}> · </span>
+                      <LedgerOwnerName name={m.name} url={m.url} active={active} />
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => onSelectOwner(active ? null : m.name)}
-                      className={`shrink-0 text-[9px] font-medium underline-offset-2 hover:underline sm:text-[10px] ${active ? "text-white" : "text-[#141414]"}`}
-                    >
-                      {active ? "Hide" : "See lots"}
-                    </button>
+                    <span className={`shrink-0 text-[9px] font-medium sm:text-[10px] ${active ? "text-white" : "text-[#141414]"}`}>
+                      {formatMoney(m.spent)}
+                    </span>
                   </li>
                 );
               })}
@@ -98,29 +102,24 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                 return (
                   <li
                     key={o.name}
-                    className={`flex items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelectOwner(active ? null : o.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectOwner(active ? null : o.name);
+                      }
+                    }}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
                   >
                     <OwnerAvatar name={o.name} image={o.image} color={o.color} url={o.url} size={22} />
                     <span className="min-w-0 flex-1 truncate text-[10px] sm:text-[11px]">
-                      {i + 1}. <span className="font-medium">{o.name}</span>
-                      {o.url ? (
-                        <>
-                          {" "}
-                          <OwnerLink url={o.url} name={o.name} className={active ? "text-white" : "text-[#6b6560]"} />
-                        </>
-                      ) : null}
-                      <span className={active ? "text-white/70" : "text-[#8a847e]"}>
-                        {" "}
-                        · {formatMoney(o.spent)} property value
-                      </span>
+                      {i + 1}. <LedgerOwnerName name={o.name} url={o.url} active={active} />
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => onSelectOwner(active ? null : o.name)}
-                      className={`shrink-0 text-[9px] font-medium underline-offset-2 hover:underline sm:text-[10px] ${active ? "text-white" : "text-[#141414]"}`}
-                    >
-                      {active ? "Hide" : "See lots"}
-                    </button>
+                    <span className={`shrink-0 text-[9px] font-medium sm:text-[10px] ${active ? "text-white" : "text-[#141414]"}`}>
+                      {formatMoney(o.spent)}
+                    </span>
                   </li>
                 );
               })}
@@ -138,13 +137,7 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                 <li key={`${b.id}-${b.purchasedAt}`} className="flex items-center gap-1.5">
                   <OwnerAvatar name={b.ownerName} image={b.ownerImage} color={b.ownerColor} url={b.ownerUrl} size={20} />
                   <span className="min-w-0 flex-1 truncate text-[10px] text-[#141414] sm:text-[11px]">
-                    <span className="font-medium">{b.ownerName}</span>
-                    {b.ownerUrl ? (
-                      <>
-                        {" "}
-                        <OwnerLink url={b.ownerUrl} name={b.ownerName} className="text-[#6b6560]" />
-                      </>
-                    ) : null}
+                    <LedgerOwnerName name={b.ownerName} url={b.ownerUrl} />
                     <span className="text-[#8a847e]"> · {b.neighborhoodName}</span>
                   </span>
                   <span className="shrink-0 text-[10px] text-[#6b6560]">{formatMoney(b.price)}</span>
@@ -158,6 +151,30 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
         </div>
       </div>
     </div>
+  );
+}
+
+function LedgerOwnerName({
+  name,
+  url,
+  active = false,
+}: {
+  name: string;
+  url?: string;
+  active?: boolean;
+}) {
+  const className = `font-medium underline-offset-2 ${active ? "text-white" : "text-[#141414]"}`;
+  if (!url) return <span className={className}>{name}</span>;
+  return (
+    <a
+      href={hrefFor(url)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`${className} underline hover:opacity-80`}
+    >
+      {name}
+    </a>
   );
 }
 
