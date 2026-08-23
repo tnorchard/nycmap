@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 const VISITOR_KEY = "nycmap-visitor-id";
-const COUNTED_KEY = "nycmap-visitor-counted";
 
 function visitorId() {
   const existing = localStorage.getItem(VISITOR_KEY);
@@ -23,20 +22,18 @@ export function usePresence() {
   useEffect(() => {
     let cancelled = false;
     const id = visitorId();
-    const isNewVisitor = !localStorage.getItem(COUNTED_KEY);
 
     const ping = async () => {
       try {
         const res = await fetch("/api/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ visitorId: id, isNewVisitor: isNewVisitor && !localStorage.getItem(COUNTED_KEY) }),
+          body: JSON.stringify({ visitorId: id }),
         });
-        const data = (await res.json()) as { online?: number; visitors?: number };
-        if (cancelled) return;
+        const data = (await res.json()) as { online?: number; visitors?: number; error?: string };
+        if (cancelled || !res.ok || data.error) return;
         if (typeof data.online === "number") setOnline(Math.max(1, data.online));
         if (typeof data.visitors === "number") setVisitors(data.visitors);
-        if (isNewVisitor) localStorage.setItem(COUNTED_KEY, "1");
       } catch {
         /* keep last known counts */
       }

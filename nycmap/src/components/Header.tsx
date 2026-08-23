@@ -36,7 +36,7 @@ export default function Header({
               NYC MAP
             </h1>
             <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#8a847e]">
-              {current.name} · digital dirt
+              {current.name}
             </p>
           </div>
 

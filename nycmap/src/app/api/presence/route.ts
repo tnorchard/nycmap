@@ -10,21 +10,21 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Presence unavailable";
-    return NextResponse.json({ online: 0, visitors: 0, error: message }, { status: 200 });
+    return NextResponse.json({ online: 0, visitors: 0, error: message }, { status: 503 });
   }
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as { visitorId?: string; isNewVisitor?: boolean };
+  const body = (await request.json().catch(() => ({}))) as { visitorId?: string };
   const visitorId = (body.visitorId ?? "").trim().slice(0, 80);
   if (!visitorId) {
     return NextResponse.json({ error: "Missing visitorId" }, { status: 400 });
   }
   try {
-    const data = await heartbeatPresence(visitorId, Boolean(body.isNewVisitor));
+    const data = await heartbeatPresence(visitorId);
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Presence unavailable";
-    return NextResponse.json({ online: 1, visitors: 0, error: message }, { status: 200 });
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }

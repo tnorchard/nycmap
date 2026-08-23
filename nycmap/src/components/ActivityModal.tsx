@@ -46,7 +46,7 @@ export default function ActivityModal({
             <p className="text-[10px] uppercase tracking-[0.18em] text-[#8a847e]">City activity</p>
             <h2 className="font-serif mt-1 text-3xl text-[#141414] sm:text-4xl">Who owns New York</h2>
             <p className="mt-1 max-w-xl text-[13px] leading-snug text-[#6b6560]">
-              Tycoons ranked by loot. Squatters in the footnotes. A claim is a billboard — tap a name or photo,
+              Tycoons ranked by property value. A claim is a billboard — tap a name or photo,
               send them traffic. That’s the whole sport.
             </p>
             <p className="mt-2 text-[12px] text-[#6b6560]">
@@ -111,7 +111,7 @@ export default function ActivityModal({
                         <OwnerLink url={o.url} name={o.name} className={`block truncate text-[12px] ${active ? "text-white" : "text-[#6b6560]"}`} />
                       ) : null}
                       <p className={`text-[11px] ${active ? "text-white/70" : "text-[#8a847e]"}`}>
-                        {o.count} lot{o.count === 1 ? "" : "s"} · {formatMoney(o.spent)} on the books
+                        {o.count} lot{o.count === 1 ? "" : "s"} · {formatMoney(o.spent)} property value
                       </p>
                     </div>
                     <button
