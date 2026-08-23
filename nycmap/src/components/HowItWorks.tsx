@@ -15,7 +15,7 @@ export default function HowItWorks({ open, onClose }: Props) {
       <div className="claim-sheet w-full max-w-lg rounded-3xl border border-[#e4e0d8] bg-[#f6f4ef] p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-[#8a847e]">The idea</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[#8a847e]">About</p>
             <h2 className="font-serif mt-1 text-3xl leading-tight text-[#141414]">
               New York is for sale.
             </h2>
@@ -44,15 +44,25 @@ export default function HowItWorks({ open, onClose }: Props) {
           <Step n="03" title="Hold the empire" body="Tycoons get hunted. Anyone can take a single lot at 1.5× the last sale. Stack the most value in a neighborhood and you’re mayor — your name sits on the map until someone outspends you." />
         </ol>
 
-        <p className="mt-6 text-[11px] leading-relaxed text-[#8a847e]">
+        <div className="mt-6 rounded-2xl border border-[#e4e0d8] bg-white px-4 py-3">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-[#8a847e]">Contact</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#5c574f]">
+            Questions, press, or you just want to yell — that’s me on X / Twitter.
+          </p>
+          <a
+            href="https://x.com/dullylamb"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex text-[13px] font-medium text-[#141414] underline underline-offset-2"
+          >
+            @dullylamb
+          </a>
+        </div>
+
+        <p className="mt-4 text-[11px] leading-relaxed text-[#8a847e]">
           Lots are drawn from public NYC tax-block / DCP data. The geometry is a souvenir, not a survey:
           lines can drift, lots get merged, industrial tracts get lumpy. This is not real property,
           not a legal description, and not affiliated with the City of New York. Checkout is billed by SportBusy LLC as NYC MAP.
-          Questions?{" "}
-          <a href="https://x.com/dullylamb" target="_blank" rel="noreferrer" className="underline underline-offset-2">
-            @dullylamb
-          </a>
-          {" "}on X.
         </p>
 
         <button

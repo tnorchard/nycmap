@@ -76,7 +76,7 @@ export default function Header({
               onClick={onHowItWorks}
               className="rounded-2xl border border-[#e4e0d8] bg-white px-3.5 py-2.5 text-[12px] font-medium text-[#141414] shadow-sm transition hover:bg-[#f6f4ef]"
             >
-              How it works
+              About
             </button>
             <a
               href="https://x.com/dullylamb"

@@ -185,14 +185,6 @@ function ViewBounds({ onBounds }: { onBounds: (bounds: L.LatLngBounds) => void }
 }
 
 function HoodBorders({ ntas }: { ntas: NtaFC | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map.getPane("hood-borders")) {
-      const pane = map.createPane("hood-borders");
-      pane.style.zIndex = "450";
-      pane.style.pointerEvents = "none";
-    }
-  }, [map]);
   if (!ntas) return null;
   return (
     <GeoJSON
@@ -204,7 +196,6 @@ function HoodBorders({ ntas }: { ntas: NtaFC | null }) {
         color: "#141414",
         weight: 2.4,
         opacity: 0.95,
-        pane: "hood-borders",
       }}
     />
   );
