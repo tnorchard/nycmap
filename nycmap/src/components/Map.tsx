@@ -171,6 +171,45 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
   return null;
 }
 
+function ViewBounds({ onBounds }: { onBounds: (bounds: L.LatLngBounds) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const fire = () => onBounds(map.getBounds());
+    fire();
+    map.on("moveend zoomend", fire);
+    return () => {
+      map.off("moveend zoomend", fire);
+    };
+  }, [map, onBounds]);
+  return null;
+}
+
+function HoodBorders({ ntas }: { ntas: NtaFC | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map.getPane("hood-borders")) {
+      const pane = map.createPane("hood-borders");
+      pane.style.zIndex = "450";
+      pane.style.pointerEvents = "none";
+    }
+  }, [map]);
+  if (!ntas) return null;
+  return (
+    <GeoJSON
+      data={ntas as never}
+      interactive={false}
+      style={{
+        fill: false,
+        fillOpacity: 0,
+        color: "#141414",
+        weight: 2.4,
+        opacity: 0.95,
+        pane: "hood-borders",
+      }}
+    />
+  );
+}
+
 function LabelsOverlay() {
   const map = useMap();
   const [ready, setReady] = useState(false);
@@ -304,7 +343,6 @@ function NeighborhoodLabels({
         const props = feature.properties;
         if (!props?.name) continue;
         const dim = props.boro !== borough;
-        if (dim && z < 12) continue;
         const mayor = props.type === "park" ? undefined : mayors[props.id];
 
         const ring = largestRing(feature.geometry);
@@ -329,9 +367,7 @@ function NeighborhoodLabels({
         const minW = props.type === "park" ? 90 : mayor ? 72 : 56;
         const minH = props.type === "park" ? 40 : mayor ? 32 : 22;
         if (z < 14 && (w < minW || h < minH)) continue;
-        if (z >= 14 && dim) continue;
         if (z >= 16 && props.type === "park") continue;
-        if (z >= 16 && !pointInRing(map.getCenter().lat, map.getCenter().lng, ring)) continue;
 
         const mayorLine = mayor
           ? `<span class="hood-mayor">Mayor ${escapeHtml(mayor.url ? displayHost(mayor.url) : mayor.name)}</span>`
@@ -392,6 +428,27 @@ export default function Map({
   const { ownedBlocks, getBlockOwner, getBlocksForNeighborhood, getMayors } = useOwnership();
   const mayors = useMemo(() => getMayors(), [getMayors]);
   const showBlocks = zoom >= 14;
+  const [viewBounds, setViewBounds] = useState<L.LatLngBounds | null>(null);
+  const lotBBox = useMemo(() => {
+    const m = new globalThis.Map<string, [number, number, number, number]>();
+    if (!blocks) return m;
+    for (const f of blocks.features) {
+      const ring = largestRing(f.geometry);
+      if (!ring) continue;
+      let minLng = Infinity;
+      let minLat = Infinity;
+      let maxLng = -Infinity;
+      let maxLat = -Infinity;
+      for (const [lng, lat] of ring) {
+        if (lng < minLng) minLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lng > maxLng) maxLng = lng;
+        if (lat > maxLat) maxLat = lat;
+      }
+      m.set(f.properties.id, [minLng, minLat, maxLng, maxLat]);
+    }
+    return m;
+  }, [blocks]);
   const visibleBlocks = (() => {
     if (!blocks) return null;
     const ownerLots = highlightOwner
@@ -400,15 +457,29 @@ export default function Map({
     if (!showBlocks && ownerLots.length === 0) return null;
     const seen = new Set(ownerLots.map((f) => f.properties.id));
     const rest = showBlocks
-      ? blocks.features.filter((f) => f.properties.boro === borough && !seen.has(f.properties.id))
+      ? blocks.features.filter((f) => {
+          if (seen.has(f.properties.id)) return false;
+          if (!viewBounds) return true;
+          const bb = lotBBox.get(f.properties.id);
+          if (!bb) return false;
+          const b = viewBounds.pad(0.2);
+          return bb[0] <= b.getEast() && bb[2] >= b.getWest() && bb[1] <= b.getNorth() && bb[3] >= b.getSouth();
+        })
       : [];
     const features = [...ownerLots, ...rest];
     if (features.length === 0) return null;
     return { type: "FeatureCollection" as const, features };
   })();
+  const boundsKey = viewBounds
+    ? `${viewBounds.getWest().toFixed(2)}-${viewBounds.getSouth().toFixed(2)}-${viewBounds.getEast().toFixed(2)}-${viewBounds.getNorth().toFixed(2)}`
+    : "x";
 
   selectedRef.current = selectedIds;
   highlightRef.current = highlightOwner;
+
+  useEffect(() => {
+    setHover(null);
+  }, [boundsKey, showBlocks]);
 
   useEffect(() => {
     fetch("/data/nyc-neighborhoods.geojson")
@@ -440,17 +511,16 @@ export default function Map({
       if (!feature?.properties) return {};
       const owned = getBlocksForNeighborhood(feature.properties.id).length;
       const isPark = feature.properties.type === "park";
-      const dim = feature.properties.boro !== borough;
       return {
         fillColor: isPark ? "#e7efe4" : priceFill(feature.properties.price),
-        fillOpacity: dim ? 0.08 : showBlocks ? 0.04 : owned > 0 ? 0.58 : 0.42,
-        color: dim ? "#cfc9c0" : "#1a1a1a",
-        weight: dim ? 0.4 : showBlocks ? 0.7 : 1.1,
-        opacity: dim ? 0.4 : 0.9,
+        fillOpacity: showBlocks ? 0.03 : owned > 0 ? 0.58 : 0.42,
+        color: "#141414",
+        weight: showBlocks ? 0 : 1.25,
+        opacity: 0.95,
         interactive: !showBlocks,
       };
     },
-    [borough, getBlocksForNeighborhood, showBlocks]
+    [getBlocksForNeighborhood, showBlocks]
   );
 
   const paintBlock = useCallback(
@@ -582,6 +652,7 @@ export default function Map({
         {showBlocks ? <LabelsOverlay /> : null}
         <NeighborhoodLabels ntas={ntas} borough={borough} mayors={mayors} />
         <ZoomTracker onZoom={setZoom} />
+        <ViewBounds onBounds={setViewBounds} />
         <Camera command={camera} />
         <ViewportBorough onBorough={onBoroughInView} />
         <FocusOwner
@@ -612,9 +683,10 @@ export default function Map({
             data={visibleBlocks as never}
             style={(feature) => paintBlock(feature?.properties?.id ?? "")}
             onEachFeature={onEachBlock}
-            key={`blocks-${borough}-${highlightOwner ?? "none"}-${showBlocks ? "z" : "h"}`}
+            key={`blocks-${highlightOwner ?? "none"}-${showBlocks ? boundsKey : "h"}`}
           />
         )}
+        {showBlocks ? <HoodBorders ntas={ntas} /> : null}
       </MapContainer>
 
       {hover && showBlocks && (
