@@ -72,6 +72,127 @@ body {
   outline: none;
 }
 
+.hood-label-wrap {
+  background: none !important;
+  border: none !important;
+}
+
+.hood-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 160px;
+  padding: 5px 10px 6px;
+  border-radius: 14px;
+  border: 1px solid #e4e0d8;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(20, 20, 20, 0.1);
+  color: #141414;
+  text-align: center;
+  pointer-events: none;
+}
+
+.hood-name {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  color: #141414;
+}
+
+.hood-mayor {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #141414;
+}
+
+.hood-label-wrap.has-mayor .hood-label {
+  border-radius: 14px;
+  padding: 5px 10px 6px;
+  border-color: #141414;
+}
+
+.hood-label-wrap.is-dim .hood-label {
+  opacity: 0.72;
+  background: #ffffff;
+}
+
+.hood-label-wrap.is-park .hood-label {
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #4d5c4a;
+  background: rgba(231, 239, 228, 0.78);
+  border-color: rgba(196, 214, 190, 0.9);
+}
+
+.hood-label-wrap.is-lots .hood-label {
+  padding: 4px 8px 5px;
+  border-radius: 12px;
+  gap: 1px;
+}
+
+.hood-label-wrap.is-lots .hood-name {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.hood-label-wrap.is-lots .hood-mayor {
+  font-size: 8px;
+}
+
+.hood-label-wrap.is-street .hood-label {
+  padding: 3px 8px 4px;
+  border-radius: 11px;
+  gap: 1px;
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.12);
+}
+
+.hood-label-wrap.is-street .hood-name {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.hood-label-wrap.is-street .hood-mayor {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 640px) {
+  .hood-name {
+    max-width: 104px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .hood-mayor {
+    max-width: 104px;
+    font-size: 7px;
+  }
+  .hood-label {
+    max-width: 116px;
+    padding: 2px 6px;
+  }
+}
+
 .claim-sheet {
   animation: rise 280ms ease;
 }

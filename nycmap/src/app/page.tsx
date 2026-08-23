@@ -8,7 +8,7 @@ import BlockPanel from "@/components/BlockPanel";
 import BundleBar from "@/components/BundleBar";
 import HowItWorks from "@/components/HowItWorks";
 import Leaderboard from "@/components/Leaderboard";
-import ActivityModal from "@/components/ActivityModal";
+import ActivityModal, { type ActivityTab } from "@/components/ActivityModal";
 import PurchaseModal from "@/components/PurchaseModal";
 import { OwnershipProvider, useOwnership } from "@/lib/ownership";
 import { usePresence } from "@/lib/use-presence";
@@ -35,7 +35,7 @@ function HomeInner() {
   const [camera, setCamera] = useState<CameraCommand | null>(null);
   const [how, setHow] = useState(false);
   const [activity, setActivity] = useState(false);
-  const [activityTab, setActivityTab] = useState<"deeds" | "landlords">("deeds");
+  const [activityTab, setActivityTab] = useState<ActivityTab>("mayors");
   const [highlightOwner, setHighlightOwner] = useState<string | null>(null);
   const [highlightSeq, setHighlightSeq] = useState(0);
   const { online, visitors } = usePresence();

@@ -3,6 +3,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { OwnedBlock } from "@/types";
 
+export type NeighborhoodMayor = {
+  neighborhoodId: string;
+  neighborhoodName: string;
+  name: string;
+  url: string;
+  image: string;
+  color: string;
+  count: number;
+  spent: number;
+};
+
 interface OwnershipContextType {
   ownedBlocks: OwnedBlock[];
   purchaseBlock: (block: OwnedBlock) => void;
@@ -18,6 +29,7 @@ interface OwnershipContextType {
     count: number;
     spent: number;
   }[];
+  getMayors: () => Record<string, NeighborhoodMayor>;
 }
 
 const OwnershipContext = createContext<OwnershipContextType | null>(null);
@@ -112,6 +124,64 @@ export function OwnershipProvider({ children }: { children: React.ReactNode }) {
     return Array.from(map.values()).sort((a, b) => b.spent - a.spent).slice(0, 10);
   }, [ownedBlocks]);
 
+  const getMayors = useCallback(() => {
+    const byHood = new Map<
+      string,
+      Map<
+        string,
+        NeighborhoodMayor & { firstAt: string }
+      >
+    >();
+    for (const b of ownedBlocks) {
+      if (!b.neighborhoodId) continue;
+      let owners = byHood.get(b.neighborhoodId);
+      if (!owners) {
+        owners = new Map();
+        byHood.set(b.neighborhoodId, owners);
+      }
+      const e = owners.get(b.ownerName);
+      if (e) {
+        e.count++;
+        e.spent += b.price;
+        if (!e.url && b.ownerUrl) e.url = b.ownerUrl;
+        if (!e.image && b.ownerImage) e.image = b.ownerImage;
+        if (!e.color && b.ownerColor) e.color = b.ownerColor;
+        if (b.purchasedAt < e.firstAt) e.firstAt = b.purchasedAt;
+      } else {
+        owners.set(b.ownerName, {
+          neighborhoodId: b.neighborhoodId,
+          neighborhoodName: b.neighborhoodName,
+          name: b.ownerName,
+          url: b.ownerUrl,
+          image: b.ownerImage,
+          color: b.ownerColor,
+          count: 1,
+          spent: b.price,
+          firstAt: b.purchasedAt,
+        });
+      }
+    }
+    const result: Record<string, NeighborhoodMayor> = {};
+    for (const [hood, owners] of byHood) {
+      const top = Array.from(owners.values()).sort(
+        (a, b) => b.spent - a.spent || b.count - a.count || a.firstAt.localeCompare(b.firstAt)
+      )[0];
+      if (top) {
+        result[hood] = {
+          neighborhoodId: hood,
+          neighborhoodName: top.neighborhoodName,
+          name: top.name,
+          url: top.url,
+          image: top.image,
+          color: top.color,
+          count: top.count,
+          spent: top.spent,
+        };
+      }
+    }
+    return result;
+  }, [ownedBlocks]);
+
   return (
     <OwnershipContext.Provider
       value={{
@@ -122,6 +192,7 @@ export function OwnershipProvider({ children }: { children: React.ReactNode }) {
         getBlocksForNeighborhood,
         getTotalRevenue,
         getTopOwners,
+        getMayors,
       }}
     >
       {children}

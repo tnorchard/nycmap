@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -8,6 +8,8 @@ import { useOwnership } from "@/lib/ownership";
 import { BlockProperties } from "@/types";
 import { formatMoney, LOT_PRICE } from "@/lib/pricing";
 import { BOROUGHS, BoroughId } from "@/data/neighborhoods";
+import { displayHost } from "@/lib/owner-display";
+import type { NeighborhoodMayor } from "@/lib/ownership";
 import type { CameraCommand } from "@/lib/camera";
 
 export type { CameraCommand };
@@ -193,6 +195,174 @@ function LabelsOverlay() {
   );
 }
 
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] ?? ch));
+}
+
+function largestRing(geom: Geom): number[][] | null {
+  if (geom.type === "Polygon") {
+    return (geom.coordinates as number[][][])[0] ?? null;
+  }
+  if (geom.type !== "MultiPolygon") return null;
+  const polys = geom.coordinates as number[][][][];
+  let best: number[][] | null = null;
+  let bestN = 0;
+  for (const poly of polys) {
+    const ring = poly[0];
+    if (ring && ring.length > bestN) {
+      best = ring;
+      bestN = ring.length;
+    }
+  }
+  return best;
+}
+
+function pointInRing(lat: number, lng: number, ring: number[][]) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [x0, y0] = ring[j];
+    const [x1, y1] = ring[i];
+    const crosses = y0 > lat !== y1 > lat && lng < ((x1 - x0) * (lat - y0)) / (y1 - y0) + x0;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function ringCentroid(ring: number[][]): [number, number] | null {
+  if (ring.length < 3) return null;
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [x0, y0] = ring[j];
+    const [x1, y1] = ring[i];
+    const f = x0 * y1 - x1 * y0;
+    twiceArea += f;
+    cx += (x0 + x1) * f;
+    cy += (y0 + y1) * f;
+  }
+  if (Math.abs(twiceArea) < 1e-12) {
+    const n = ring.length;
+    return [ring.reduce((s, p) => s + p[1], 0) / n, ring.reduce((s, p) => s + p[0], 0) / n];
+  }
+  return [cy / (3 * twiceArea), cx / (3 * twiceArea)];
+}
+
+function visibleAnchor(ring: number[][], map: L.Map): [number, number] | null {
+  const view = map.getBounds();
+  const pad = view.pad(-0.12);
+  const focus = pad.getCenter();
+  if (pointInRing(focus.lat, focus.lng, ring)) return [focus.lat, focus.lng];
+
+  const visible: number[][] = [];
+  for (const [lng, lat] of ring) {
+    if (pad.contains(L.latLng(lat, lng))) visible.push([lng, lat]);
+  }
+  if (visible.length >= 3) return ringCentroid(visible);
+  if (visible.length > 0) {
+    return [
+      visible.reduce((s, pt) => s + pt[1], 0) / visible.length,
+      visible.reduce((s, pt) => s + pt[0], 0) / visible.length,
+    ];
+  }
+
+  const box = L.latLngBounds(ring.map(([lng, lat]) => L.latLng(lat, lng)));
+  if (!box.intersects(view)) return null;
+  if (pointInRing(view.getCenter().lat, view.getCenter().lng, ring)) {
+    return [view.getCenter().lat, view.getCenter().lng];
+  }
+  return ringCentroid(ring);
+}
+
+function NeighborhoodLabels({
+  ntas,
+  borough,
+  mayors,
+}: {
+  ntas: NtaFC | null;
+  borough: BoroughId;
+  mayors: Record<string, NeighborhoodMayor>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map.getPane("hood-labels")) {
+      const pane = map.createPane("hood-labels");
+      pane.style.zIndex = "655";
+      pane.style.pointerEvents = "none";
+    }
+
+    const group = L.layerGroup().addTo(map);
+    const draw = () => {
+      group.clearLayers();
+      const z = map.getZoom();
+      if (!ntas || z < 11) return;
+      const scale = z >= 16 ? " is-street" : z >= 14 ? " is-lots" : "";
+
+      for (const feature of ntas.features) {
+        const props = feature.properties;
+        if (!props?.name) continue;
+        const dim = props.boro !== borough;
+        if (dim && z < 12) continue;
+        const mayor = props.type === "park" ? undefined : mayors[props.id];
+
+        const ring = largestRing(feature.geometry);
+        if (!ring) continue;
+        const center = visibleAnchor(ring, map);
+        if (!center) continue;
+
+        let minLng = Infinity;
+        let minLat = Infinity;
+        let maxLng = -Infinity;
+        let maxLat = -Infinity;
+        for (const [lng, lat] of ring) {
+          if (lng < minLng) minLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lng > maxLng) maxLng = lng;
+          if (lat > maxLat) maxLat = lat;
+        }
+        const sw = map.latLngToContainerPoint([minLat, minLng]);
+        const ne = map.latLngToContainerPoint([maxLat, maxLng]);
+        const w = Math.abs(ne.x - sw.x);
+        const h = Math.abs(ne.y - sw.y);
+        const minW = props.type === "park" ? 90 : mayor ? 72 : 56;
+        const minH = props.type === "park" ? 40 : mayor ? 32 : 22;
+        if (z < 14 && (w < minW || h < minH)) continue;
+        if (z >= 14 && dim) continue;
+        if (z >= 16 && props.type === "park") continue;
+        if (z >= 16 && !pointInRing(map.getCenter().lat, map.getCenter().lng, ring)) continue;
+
+        const mayorLine = mayor
+          ? `<span class="hood-mayor">Mayor ${escapeHtml(mayor.url ? displayHost(mayor.url) : mayor.name)}</span>`
+          : "";
+        const marker = L.marker(center, {
+          icon: L.divIcon({
+            className: `hood-label-wrap${dim ? " is-dim" : ""}${props.type === "park" ? " is-park" : ""}${mayor ? " has-mayor" : ""}${scale}`,
+            html: `<span class="hood-label"><span class="hood-name">${escapeHtml(props.name)}</span>${mayorLine}</span>`,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0],
+          }),
+          interactive: false,
+          keyboard: false,
+          pane: "hood-labels",
+        });
+        group.addLayer(marker);
+      }
+    };
+
+    draw();
+    map.on("zoomend moveend", draw);
+    return () => {
+      map.off("zoomend moveend", draw);
+      group.clearLayers();
+      map.removeLayer(group);
+    };
+  }, [map, ntas, borough, mayors]);
+
+  return null;
+}
+
 function priceFill(price: number) {
   const t = Math.min(1, Math.max(0, (price - 6) / 94));
   const l = 92 - t * 28;
@@ -219,7 +389,8 @@ export default function Map({
   const ntaRef = useRef<L.GeoJSON | null>(null);
   const selectedRef = useRef<string[]>(selectedIds);
   const highlightRef = useRef<string | null>(highlightOwner);
-  const { ownedBlocks, getBlockOwner, getBlocksForNeighborhood } = useOwnership();
+  const { ownedBlocks, getBlockOwner, getBlocksForNeighborhood, getMayors } = useOwnership();
+  const mayors = useMemo(() => getMayors(), [getMayors]);
   const showBlocks = zoom >= 14;
   const visibleBlocks = (() => {
     if (!blocks) return null;
@@ -371,6 +542,11 @@ export default function Map({
             y: e.containerPoint.y,
           });
         },
+        mousemove: (e: L.LeafletMouseEvent) => {
+          setHover((prev) =>
+            prev ? { ...prev, x: e.containerPoint.x, y: e.containerPoint.y } : prev
+          );
+        },
         mouseout: (e: L.LeafletMouseEvent) => {
           (e.target as L.Path).setStyle(paintBlock(p.id));
           setHover(null);
@@ -403,7 +579,8 @@ export default function Map({
           attribution="&copy; OSM · CARTO · NYC DCP / DOF"
           url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
         />
-        <LabelsOverlay />
+        {showBlocks ? <LabelsOverlay /> : null}
+        <NeighborhoodLabels ntas={ntas} borough={borough} mayors={mayors} />
         <ZoomTracker onZoom={setZoom} />
         <Camera command={camera} />
         <ViewportBorough onBorough={onBoroughInView} />
@@ -443,7 +620,7 @@ export default function Map({
       {hover && showBlocks && (
         <div
           className="pointer-events-none absolute z-[500] rounded-lg border border-[#e4e0d8] bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm"
-          style={{ left: Math.min(hover.x + 14, 280), top: hover.y + 14 }}
+          style={{ left: hover.x + 14, top: hover.y + 14 }}
         >
           <p className="text-[11px] font-medium tracking-wide text-[#141414]">{hover.name}</p>
           <p className="text-[10px] text-[#6b6560]">

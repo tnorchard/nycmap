@@ -41,13 +41,18 @@ export default function HowItWorks({ open, onClose }: Props) {
         <ol className="mt-6 space-y-4">
           <Step n="01" title="Assemble a parcel" body="Tap unclaimed lots until you have five. That’s the buy-in. Think Monopoly, except the board is the actual city." />
           <Step n="02" title="Plant the flag" body="Pay $1 a lot. Your name, link, and picture go on the map. People click through. That’s the whole prize." />
-          <Step n="03" title="Hold the empire" body="Tycoons get hunted. Anyone can take a single lot at 1.5× the last sale. Outbid them — or watch the skyline change hands." />
+          <Step n="03" title="Hold the empire" body="Tycoons get hunted. Anyone can take a single lot at 1.5× the last sale. Stack the most value in a neighborhood and you’re mayor — your name sits on the map until someone outspends you." />
         </ol>
 
         <p className="mt-6 text-[11px] leading-relaxed text-[#8a847e]">
           Lots are drawn from public NYC tax-block / DCP data. The geometry is a souvenir, not a survey:
           lines can drift, lots get merged, industrial tracts get lumpy. This is not real property,
           not a legal description, and not affiliated with the City of New York. Checkout is billed by SportBusy LLC as NYC MAP.
+          Questions?{" "}
+          <a href="https://x.com/dullylamb" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            @dullylamb
+          </a>
+          {" "}on X.
         </p>
 
         <button
