@@ -37,7 +37,7 @@ export async function heartbeatPresence(visitorId: string) {
   ) as { total_visitors: number } | null;
 
   return {
-    online: onlineResult.count ?? 1,
+    online: onlineResult.count ?? 0,
     visitors: Number(stats?.total_visitors ?? 0),
   };
 }
