@@ -60,13 +60,14 @@ export async function POST(request: Request) {
   }
 
   const amountCents = Math.round(bid * 100);
-  const productId = process.env.STRIPE_NYCMAP_PRODUCT_ID || "nycmap_lot";
   const origin = appBaseUrl();
   const label = current ? "Takeover" : "Claim";
   const place = [neighborhoodName, borough].filter(Boolean).join(", ");
   const stripe = getStripe();
 
-  const session = await stripe.checkout.sessions.create({
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
     mode: "payment",
     success_url: `${origin}/claim/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=canceled`,
@@ -82,7 +83,14 @@ export async function POST(request: Request) {
         price_data: {
           currency: "usd",
           unit_amount: amountCents,
-          product: productId,
+          product_data: {
+            name: "NYC Map lot claim",
+            description: `Digital souvenir — ${label} lot ${blockId}. Not real NYC property.`,
+            metadata: {
+              app: "nycmap",
+              product: "lot_claim",
+            },
+          },
         },
       },
     ],
@@ -113,6 +121,11 @@ export async function POST(request: Request) {
       base_price: String(basePrice),
     },
   });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Checkout failed";
+    console.error("Stripe checkout session failed:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   if (!session.url) {
     return NextResponse.json({ error: "Stripe did not return a checkout URL" }, { status: 500 });
