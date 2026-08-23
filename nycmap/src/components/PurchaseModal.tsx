@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BlockProperties, OwnedBlock } from "@/types";
 import { bundlePrice, formatMoney, LOT_PRICE, minOutbid } from "@/lib/pricing";
 import { toLotPayload } from "@/lib/lots";
+import { getBuyerToken, peekGiftCode } from "@/lib/buyer";
 
 const COLORS = ["#141414", "#8B1E3F", "#1F4E5F", "#C45C26", "#2F5D50", "#3D348B", "#B08900"];
 
@@ -25,6 +26,9 @@ export default function PurchaseModal({ lots, owner, onClose }: Props) {
   const [error, setError] = useState("");
 
   const bid = isTakeover ? Number(bidAmount) || 0 : minBid;
+  const giftCode = peekGiftCode();
+  const giftCredit = !isTakeover && giftCode ? LOT_PRICE : 0;
+  const due = Math.max(1, bid - giftCredit);
   const valid = Boolean(name.trim() && url.trim() && bid >= minBid);
   const headline = isTakeover
     ? `${lots[0].neighborhood} ${lots[0].block}`
@@ -47,6 +51,8 @@ export default function PurchaseModal({ lots, owner, onClose }: Props) {
           ownerImage: image.trim(),
           ownerColor: color,
           bid,
+          giftCode: peekGiftCode(),
+          buyerToken: getBuyerToken(),
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
@@ -102,7 +108,12 @@ export default function PurchaseModal({ lots, owner, onClose }: Props) {
               Unclaimed lots are {formatMoney(LOT_PRICE)} each. Five is the buy-in. Your link is the billboard;
               your photo is the flag people see on the map.
             </p>
-            <p className="font-serif mt-2 text-3xl text-[#141414]">{formatMoney(minBid)}</p>
+            <p className="font-serif mt-2 text-3xl text-[#141414]">{formatMoney(due)}</p>
+            {giftCredit ? (
+              <p className="mt-1 text-[12px] text-[#5c574f]">
+                Gift {giftCode} covers one lot. Five lots for {formatMoney(due)} instead of {formatMoney(minBid)}.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -111,7 +122,7 @@ export default function PurchaseModal({ lots, owner, onClose }: Props) {
           <Field label="Your link — this is the billboard" value={url} onChange={setUrl} placeholder="https://acme.com" />
           <Field label="Photo or logo URL — this is the flag" value={image} onChange={setImage} placeholder="https://…/logo.png" />
           <p className="-mt-1 text-[11px] leading-snug text-[#8a847e]">
-            People click your link from the map, the legend, and the ledger. The picture shows up next to your name. That’s what you’re buying.
+            People click your link from the mayor pill, the legend, and the ledger. If you become mayor, your photo floats over the neighborhood. That’s the promo.
           </p>
           <div>
             <p className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8a847e]">Color on the map</p>
@@ -141,7 +152,7 @@ export default function PurchaseModal({ lots, owner, onClose }: Props) {
               ? "Sending you to Stripe…"
               : isTakeover
                 ? `Takeover for ${formatMoney(bid)}`
-                : `Claim ${lots.length} lots · ${formatMoney(bid)}`}
+                : `Claim ${lots.length} lots · ${formatMoney(due)}`}
           </button>
           {error ? <p className="mt-2 text-center text-[11px] text-[#8B1E3F]">{error}</p> : null}
           <p className="mt-2 text-center text-[10px] text-[#8a847e]">

@@ -1,11 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useOwnership } from "@/lib/ownership";
 import { formatMoney } from "@/lib/pricing";
 import { OwnerAvatar, OwnerLink } from "@/components/OwnerMark";
 
-export type ActivityTab = "mayors" | "tycoons" | "deeds";
+type Deed = {
+  id: string;
+  blockId: string;
+  neighborhoodName: string;
+  ownerName: string;
+  ownerUrl: string;
+  ownerImage: string;
+  ownerColor: string;
+  amount: number;
+  kind: string;
+  previousOwnerName: string | null;
+};
+
+export type ActivityTab = "mayors" | "tycoons" | "deeds" | "stolen";
 
 interface Props {
   open: boolean;
@@ -29,6 +43,24 @@ export default function ActivityModal({
   visitors,
 }: Props) {
   const { ownedBlocks, getTopOwners, getMayors } = useOwnership();
+  const [deeds, setDeeds] = useState<Deed[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void fetch("/api/activity")
+      .then((r) => r.json())
+      .then((data: { deeds?: Deed[] }) => {
+        if (!cancelled) setDeeds(Array.isArray(data.deeds) ? data.deeds : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDeeds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const recent = [...ownedBlocks].sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)).slice(0, 20);
@@ -74,6 +106,9 @@ export default function ActivityModal({
           </TabButton>
           <TabButton active={tab === "deeds"} onClick={() => onTab("deeds")}>
             Fresh deeds
+          </TabButton>
+          <TabButton active={tab === "stolen"} onClick={() => onTab("stolen")}>
+            Stolen
           </TabButton>
         </div>
 
@@ -164,6 +199,27 @@ export default function ActivityModal({
                     </li>
                   );
                 })}
+              </ul>
+            )
+          ) : tab === "stolen" ? (
+            deeds.filter((d) => d.kind === "takeover").length === 0 ? (
+              <Empty text="Nobody’s been robbed yet. Takeovers show up here so the whole city can watch." />
+            ) : (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {deeds
+                  .filter((d) => d.kind === "takeover")
+                  .map((d) => (
+                    <li key={d.id} className="flex items-center gap-3 rounded-2xl border border-[#eeeae3] px-3 py-2.5">
+                      <OwnerAvatar name={d.ownerName} image={d.ownerImage} color={d.ownerColor} url={d.ownerUrl} size={36} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium text-[#141414]">{d.ownerName}</p>
+                        <p className="truncate text-[11px] text-[#8a847e]">
+                          stole {d.blockId} from {d.previousOwnerName || "the last mayor"} · {d.neighborhoodName}
+                        </p>
+                      </div>
+                      <p className="font-serif shrink-0 text-[18px] text-[#141414]">{formatMoney(d.amount)}</p>
+                    </li>
+                  ))}
               </ul>
             )
           ) : recent.length === 0 ? (

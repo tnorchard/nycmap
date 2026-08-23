@@ -47,7 +47,7 @@ export default function HowItWorks({ open, onClose }: Props) {
           <Step
             n="02"
             title="Plant the flag"
-            body="Pay $1 a lot. Your name, link, and picture go on the map. People click through. That’s the whole prize."
+            body="Pay $1 a lot. Your name, link, and picture go on the map. If you become mayor, people click your URL on the pill and your photo floats over the hood. That’s the whole prize."
           />
           <Step
             n="03"
@@ -64,7 +64,8 @@ export default function HowItWorks({ open, onClose }: Props) {
           <p className="mt-2 text-[13px] leading-relaxed text-[#5c574f]">
             You don’t buy a neighborhood. You buy lots. Whoever has spent the most on lots inside a
             neighborhood becomes its mayor — the map paints that hood in their color, and their name
-            sits on the label until someone else outspends them there.
+            sits on the label until someone else outspends them there. Tap the mayor’s URL to visit
+            their site. If they uploaded a photo, it floats over the territory like a billboard.
           </p>
           <p className="mt-2 text-[13px] leading-relaxed text-[#5c574f]">
             If you’re the only person with a lot in Inwood, you’re mayor of Inwood. The seat is yours

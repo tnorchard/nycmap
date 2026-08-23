@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listClaims } from "@/lib/claims-store";
+import { getGiftByCreatorSession, listClaims } from "@/lib/claims-store";
 import { unpackLotMetadata } from "@/lib/lots";
 import { getStripe } from "@/lib/stripe";
 
@@ -19,6 +19,13 @@ export async function GET(request: Request) {
   const claims = await listClaims();
   const matched = claims.filter((c) => c.stripeSessionId === sessionId || ids.has(c.id));
   const claim = matched.find((c) => c.stripeSessionId === sessionId) ?? matched[0] ?? null;
+  let giftCode = "";
+  try {
+    const gift = await getGiftByCreatorSession(sessionId);
+    giftCode = gift?.code ?? "";
+  } catch {
+    giftCode = "";
+  }
 
   return NextResponse.json({
     status: session.status,
@@ -27,5 +34,10 @@ export async function GET(request: Request) {
     count: lots.length || matched.length,
     claimed: Boolean(claim && claim.stripeSessionId === sessionId),
     claim: claim?.stripeSessionId === sessionId ? claim : null,
+    lots: lots.map((l) => l.id),
+    neighborhoodName: lots[0]?.neighborhoodName || claim?.neighborhoodName || "",
+    ownerName: session.metadata?.owner_name || claim?.ownerName || "",
+    kind: session.metadata?.kind || "bundle",
+    giftCode,
   });
 }

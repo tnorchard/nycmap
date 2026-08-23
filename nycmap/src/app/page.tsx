@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "@/components/Header";
 import NeighborhoodRail from "@/components/NeighborhoodRail";
 import BlockPanel from "@/components/BlockPanel";
@@ -15,6 +15,7 @@ import { usePresence } from "@/lib/use-presence";
 import { BlockProperties } from "@/types";
 import { BOROUGHS, BoroughId } from "@/data/neighborhoods";
 import { MAX_BUNDLE } from "@/lib/pricing";
+import { peekGiftCode, saveGiftCode } from "@/lib/buyer";
 import type { CameraCommand } from "@/lib/camera";
 
 const Map = dynamic(() => import("@/components/Map"), {
@@ -37,10 +38,18 @@ function HomeInner() {
   const [activity, setActivity] = useState(false);
   const [activityTab, setActivityTab] = useState<ActivityTab>("mayors");
   const [highlightOwner, setHighlightOwner] = useState<string | null>(null);
+  const [previewOwner, setPreviewOwner] = useState<string | null>(null);
   const [highlightSeq, setHighlightSeq] = useState(0);
   const { online, visitors } = usePresence();
   const cameraId = useRef(0);
   const ignoreViewportUntil = useRef(0);
+  const [giftCode, setGiftCode] = useState("");
+
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("gift");
+    if (fromUrl) saveGiftCode(fromUrl);
+    setGiftCode(peekGiftCode());
+  }, []);
 
   const moveCamera = useCallback((next: Omit<CameraCommand, "id">) => {
     cameraId.current += 1;
@@ -118,6 +127,7 @@ function HomeInner() {
           borough={borough}
           selectedIds={selectedIds}
           highlightOwner={highlightOwner}
+          previewOwner={previewOwner}
           highlightSeq={highlightSeq}
           onSelectBlock={onSelectBlock}
           onSelectNeighborhood={onSelectNeighborhood}
@@ -141,6 +151,11 @@ function HomeInner() {
         online={online}
         visitors={visitors}
       />
+      {giftCode ? (
+        <div className="absolute left-1/2 top-[4.6rem] z-[1200] -translate-x-1/2 rounded-full border border-[#141414] bg-white px-3 py-1.5 text-[11px] text-[#141414] shadow-sm">
+          Gift {giftCode} is on — $1 off your next bundle.
+        </div>
+      ) : null}
       <BlockPanel block={takeover} onClose={() => setTakeover(null)} />
       <BundleBar
         lots={group}
@@ -151,6 +166,7 @@ function HomeInner() {
       <Leaderboard
         highlightOwner={highlightOwner}
         onSelectOwner={revealOwner}
+        onPreviewOwner={setPreviewOwner}
         onViewAll={(tab) => {
           setActivityTab(tab);
           setActivity(true);

@@ -8,7 +8,7 @@ import { useOwnership } from "@/lib/ownership";
 import { BlockProperties } from "@/types";
 import { formatMoney, LOT_PRICE } from "@/lib/pricing";
 import { BOROUGHS, BoroughId } from "@/data/neighborhoods";
-import { displayHost } from "@/lib/owner-display";
+import { displayHost, hrefFor } from "@/lib/owner-display";
 import type { NeighborhoodMayor } from "@/lib/ownership";
 import type { CameraCommand } from "@/lib/camera";
 
@@ -58,6 +58,7 @@ interface MapProps {
   borough: BoroughId;
   selectedIds: string[];
   highlightOwner: string | null;
+  previewOwner: string | null;
   highlightSeq: number;
   onSelectBlock: (props: BlockProperties) => void;
   onSelectNeighborhood: (id: string, bounds: LatLngBoundsLiteral) => void;
@@ -240,6 +241,12 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] ?? ch));
 }
 
+function safeHttpsUrl(value: string) {
+  const href = hrefFor(value);
+  if (!href.startsWith("http://") && !href.startsWith("https://")) return "";
+  return href;
+}
+
 function largestRing(geom: Geom): number[][] | null {
   if (geom.type === "Polygon") {
     return (geom.coordinates as number[][][])[0] ?? null;
@@ -289,11 +296,19 @@ function ringCentroid(ring: number[][]): [number, number] | null {
   return [cy / (3 * twiceArea), cx / (3 * twiceArea)];
 }
 
-function visibleAnchor(ring: number[][], map: L.Map): [number, number] | null {
+function visibleAnchor(ring: number[][], map: L.Map, aggressive = false): [number, number] | null {
   const view = map.getBounds();
-  const pad = view.pad(-0.12);
+  const pad = view.pad(aggressive ? -0.28 : -0.12);
   const focus = pad.getCenter();
   if (pointInRing(focus.lat, focus.lng, ring)) return [focus.lat, focus.lng];
+
+  const center = map.getCenter();
+  if (pointInRing(center.lat, center.lng, ring)) return [center.lat, center.lng];
+
+  if (aggressive) {
+    const sample = sampleInsideViewport(ring, map);
+    if (sample) return sample;
+  }
 
   const visible: number[][] = [];
   for (const [lng, lat] of ring) {
@@ -315,6 +330,28 @@ function visibleAnchor(ring: number[][], map: L.Map): [number, number] | null {
   return ringCentroid(ring);
 }
 
+/** Prefer a point inside the hood that sits near the viewport center (street zoom). */
+function sampleInsideViewport(ring: number[][], map: L.Map): [number, number] | null {
+  const b = map.getBounds().pad(-0.18);
+  const c = map.getCenter();
+  let best: [number, number] | null = null;
+  let bestD = Infinity;
+  const steps = 7;
+  for (let i = 0; i <= steps; i++) {
+    for (let j = 0; j <= steps; j++) {
+      const lat = b.getSouth() + ((b.getNorth() - b.getSouth()) * i) / steps;
+      const lng = b.getWest() + ((b.getEast() - b.getWest()) * j) / steps;
+      if (!pointInRing(lat, lng, ring)) continue;
+      const d = (lat - c.lat) ** 2 + (lng - c.lng) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = [lat, lng];
+      }
+    }
+  }
+  return best;
+}
+
 function NeighborhoodLabels({
   ntas,
   borough,
@@ -334,11 +371,14 @@ function NeighborhoodLabels({
     }
 
     const group = L.layerGroup().addTo(map);
+    let raf = 0;
     const draw = () => {
       group.clearLayers();
       const z = map.getZoom();
       if (!ntas || z < 11) return;
+      const street = z >= 15;
       const scale = z >= 16 ? " is-street" : z >= 14 ? " is-lots" : "";
+      const focus = map.getCenter();
 
       for (const feature of ntas.features) {
         const props = feature.properties;
@@ -348,7 +388,7 @@ function NeighborhoodLabels({
 
         const ring = largestRing(feature.geometry);
         if (!ring) continue;
-        const center = visibleAnchor(ring, map);
+        const center = visibleAnchor(ring, map, street);
         if (!center) continue;
 
         let minLng = Infinity;
@@ -368,19 +408,40 @@ function NeighborhoodLabels({
         const minW = props.type === "park" ? 90 : mayor ? 72 : 56;
         const minH = props.type === "park" ? 40 : mayor ? 32 : 22;
         if (z < 14 && (w < minW || h < minH)) continue;
-        if (z >= 16 && props.type === "park") continue;
+        if (street && props.type === "park") continue;
+        // Street zoom: only the hood under the lens (or any mayor still in view).
+        if (street) {
+          const underLens = pointInRing(focus.lat, focus.lng, ring);
+          if (!underLens && !mayor) continue;
+          if (!underLens && mayor) {
+            const box = L.latLngBounds(ring.map(([lng, lat]) => L.latLng(lat, lng)));
+            if (!box.intersects(map.getBounds())) continue;
+          }
+        }
 
+        const mayorHref = mayor?.url ? safeHttpsUrl(mayor.url) : "";
+        const mayorImage = mayor?.image ? safeHttpsUrl(mayor.image) : "";
+        const mayorLabel = mayor
+          ? `Mayor ${escapeHtml(mayor.url ? displayHost(mayor.url) : mayor.name)}`
+          : "";
         const mayorLine = mayor
-          ? `<span class="hood-mayor">Mayor ${escapeHtml(mayor.url ? displayHost(mayor.url) : mayor.name)}</span>`
+          ? mayorHref
+            ? `<a class="hood-mayor hood-mayor-link" href="${escapeHtml(mayorHref)}" target="_blank" rel="noopener noreferrer">${mayorLabel}</a>`
+            : `<span class="hood-mayor">${mayorLabel}</span>`
+          : "";
+        const flag = mayorImage
+          ? mayorHref
+            ? `<a class="hood-mayor-flag-link" href="${escapeHtml(mayorHref)}" target="_blank" rel="noopener noreferrer"><img class="hood-mayor-flag" src="${escapeHtml(mayorImage)}" alt="" /></a>`
+            : `<img class="hood-mayor-flag" src="${escapeHtml(mayorImage)}" alt="" />`
           : "";
         const marker = L.marker(center, {
           icon: L.divIcon({
             className: `hood-label-wrap${dim ? " is-dim" : ""}${props.type === "park" ? " is-park" : ""}${mayor ? " has-mayor" : ""}${scale}`,
-            html: `<span class="hood-label"><span class="hood-name">${escapeHtml(props.name)}</span>${mayorLine}</span>`,
+            html: `<span class="hood-label${flag ? " has-flag" : ""}">${flag}<span class="hood-caption"><span class="hood-name">${escapeHtml(props.name)}</span>${mayorLine}</span></span>`,
             iconSize: [0, 0],
             iconAnchor: [0, 0],
           }),
-          interactive: false,
+          interactive: Boolean(mayorHref || mayorImage),
           keyboard: false,
           pane: "hood-labels",
         });
@@ -388,10 +449,18 @@ function NeighborhoodLabels({
       }
     };
 
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(draw);
+    };
+
     draw();
     map.on("zoomend moveend", draw);
+    map.on("move zoom", schedule);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       map.off("zoomend moveend", draw);
+      map.off("move zoom", schedule);
       group.clearLayers();
       map.removeLayer(group);
     };
@@ -410,6 +479,7 @@ export default function Map({
   borough,
   selectedIds,
   highlightOwner,
+  previewOwner,
   highlightSeq,
   onSelectBlock,
   onSelectNeighborhood,
@@ -426,6 +496,7 @@ export default function Map({
   const ntaRef = useRef<L.GeoJSON | null>(null);
   const selectedRef = useRef<string[]>(selectedIds);
   const highlightRef = useRef<string | null>(highlightOwner);
+  const previewRef = useRef<string | null>(previewOwner);
   const { ownedBlocks, getBlockOwner, getBlocksForNeighborhood, getMayors } = useOwnership();
   const mayors = useMemo(() => getMayors(), [getMayors]);
   const showBlocks = zoom >= 14;
@@ -452,8 +523,9 @@ export default function Map({
   }, [blocks]);
   const visibleBlocks = (() => {
     if (!blocks) return null;
-    const ownerLots = highlightOwner
-      ? blocks.features.filter((f) => getBlockOwner(f.properties.id)?.ownerName === highlightOwner)
+    const focusName = highlightOwner || previewOwner;
+    const ownerLots = focusName
+      ? blocks.features.filter((f) => getBlockOwner(f.properties.id)?.ownerName === focusName)
       : [];
     if (!showBlocks && ownerLots.length === 0) return null;
     const seen = new Set(ownerLots.map((f) => f.properties.id));
@@ -477,6 +549,7 @@ export default function Map({
 
   selectedRef.current = selectedIds;
   highlightRef.current = highlightOwner;
+  previewRef.current = previewOwner;
 
   useEffect(() => {
     setHover(null);
@@ -540,19 +613,22 @@ export default function Map({
       const owner = getBlockOwner(id);
       const selected = selectedRef.current.includes(id);
       const focused = !!highlightRef.current && owner?.ownerName === highlightRef.current;
-      const dimmed = !!highlightRef.current && !focused;
+      const previewed = !!previewRef.current && owner?.ownerName === previewRef.current;
+      const touring = !!highlightRef.current;
+      const dimmed = touring && !focused;
       if (owner) {
         return {
           fillColor: owner.ownerColor || "#1a1a1a",
-          fillOpacity: dimmed ? 0.08 : selected || focused ? 0.9 : 0.74,
-          color: selected || focused ? "#111" : "#ffffff",
-          weight: selected || focused ? 2.6 : 0.8,
+          fillOpacity: dimmed ? 0.08 : selected || focused || previewed ? 0.92 : 0.74,
+          color: selected || focused ? "#111" : previewed ? "#fff8e8" : "#ffffff",
+          weight: selected || focused ? 2.6 : previewed ? 3.4 : 0.8,
           opacity: dimmed ? 0.2 : 1,
+          className: previewed && !focused ? "lot-glow" : "",
         };
       }
       return {
         fillColor: selected ? "#0a0a0a" : "#ffffff",
-        fillOpacity: dimmed ? 0.03 : selected ? 0.82 : 0.12,
+        fillOpacity: dimmed ? 0.03 : selected ? 0.82 : previewed ? 0.06 : 0.12,
         color: selected ? "#ffffff" : "#2a2a2a",
         weight: selected ? 3.2 : 0.6,
         opacity: dimmed ? 0.12 : selected ? 1 : 0.5,
@@ -645,7 +721,7 @@ export default function Map({
         (layer as L.Path).setStyle(paintBlock(feat.properties.id));
       }
     });
-  }, [paintBlock, ownedBlocks, selectedIds, highlightOwner]);
+  }, [paintBlock, ownedBlocks, selectedIds, highlightOwner, previewOwner]);
 
   return (
     <div className="relative h-full w-full">
@@ -695,7 +771,7 @@ export default function Map({
             data={visibleBlocks as never}
             style={(feature) => paintBlock(feature?.properties?.id ?? "")}
             onEachFeature={onEachBlock}
-            key={`blocks-${highlightOwner ?? "none"}-${showBlocks ? boundsKey : "h"}`}
+            key={`blocks-${highlightOwner ?? "none"}-${showBlocks ? boundsKey : previewOwner ?? "h"}`}
           />
         )}
         {showBlocks ? <HoodBorders ntas={ntas} mayors={mayors} /> : null}

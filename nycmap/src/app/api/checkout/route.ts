@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listClaims } from "@/lib/claims-store";
+import { getGiftByCode, giftIsRedeemable, listClaims } from "@/lib/claims-store";
 import { packLotMetadata, type LotPayload } from "@/lib/lots";
 import { bundlePrice, LOT_PRICE, MAX_BUNDLE, MIN_BUNDLE, minOutbid } from "@/lib/pricing";
 import { appBaseUrl, getStripe, integrationIdentifier } from "@/lib/stripe";
@@ -14,6 +14,8 @@ type Body = {
   ownerImage?: string;
   ownerColor?: string;
   bid?: number;
+  giftCode?: string;
+  buyerToken?: string;
 };
 
 function clip(value: string, max = 450) {
@@ -33,6 +35,8 @@ export async function POST(request: Request) {
   const ownerImage = (body.ownerImage ?? "").trim();
   const ownerColor = (body.ownerColor ?? "#141414").trim();
   const bid = Number(body.bid);
+  const giftCode = (body.giftCode ?? "").trim().toUpperCase();
+  const buyerToken = (body.buyerToken ?? "").trim();
 
   if (!lots.length || !ownerName || !ownerUrl || !Number.isFinite(bid) || bid < LOT_PRICE) {
     return NextResponse.json({ error: "Missing claim details" }, { status: 400 });
@@ -51,6 +55,16 @@ export async function POST(request: Request) {
 
   const claims = await listClaims();
   const owned = new Set(claims.map((c) => c.id));
+
+  let giftCredit = 0;
+  if (kind === "bundle" && giftCode) {
+    try {
+      const gift = await getGiftByCode(giftCode);
+      if (gift && giftIsRedeemable(gift, buyerToken)) giftCredit = LOT_PRICE;
+    } catch (err) {
+      console.error("[gift lookup]", err);
+    }
+  }
 
   if (kind === "bundle") {
     if (lots.length < MIN_BUNDLE) {
@@ -80,7 +94,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const amountCents = Math.round(bid * 100);
+  const amountCents = Math.round((kind === "bundle" ? bid - giftCredit : bid) * 100);
   const origin = appBaseUrl();
   const label = kind === "takeover" ? "Takeover" : "Claim";
   const first = lots[0];
@@ -141,6 +155,8 @@ export async function POST(request: Request) {
         owner_image: clip(ownerImage),
         owner_color: clip(ownerColor, 20),
         bid: String(bid),
+        gift_code: giftCode,
+        buyer_token: clip(buyerToken, 80),
       },
     });
   } catch (err) {

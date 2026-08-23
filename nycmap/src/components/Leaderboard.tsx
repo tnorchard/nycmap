@@ -10,10 +10,11 @@ import type { ActivityTab } from "@/components/ActivityModal";
 interface Props {
   highlightOwner: string | null;
   onSelectOwner: (name: string | null) => void;
+  onPreviewOwner: (name: string | null) => void;
   onViewAll: (tab: ActivityTab) => void;
 }
 
-export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }: Props) {
+export default function Leaderboard({ highlightOwner, onSelectOwner, onPreviewOwner, onViewAll }: Props) {
   const [open, setOpen] = useState(false);
   const { ownedBlocks, getTopOwners, getMayors } = useOwnership();
   const recent = [...ownedBlocks].sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)).slice(0, 3);
@@ -67,13 +68,17 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                     role="button"
                     tabIndex={0}
                     onClick={() => onSelectOwner(active ? null : m.name)}
+                    onMouseEnter={() => onPreviewOwner(m.name)}
+                    onMouseLeave={() => onPreviewOwner(null)}
+                    onFocus={() => onPreviewOwner(m.name)}
+                    onBlur={() => onPreviewOwner(null)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         onSelectOwner(active ? null : m.name);
                       }
                     }}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : "hover:bg-[#f6f4ef]"}`}
                   >
                     <OwnerAvatar name={m.name} image={m.image} color={m.color} url={m.url} size={22} />
                     <span className="min-w-0 flex-1 truncate text-[10px] sm:text-[11px]">
@@ -105,13 +110,17 @@ export default function Leaderboard({ highlightOwner, onSelectOwner, onViewAll }
                     role="button"
                     tabIndex={0}
                     onClick={() => onSelectOwner(active ? null : o.name)}
+                    onMouseEnter={() => onPreviewOwner(o.name)}
+                    onMouseLeave={() => onPreviewOwner(null)}
+                    onFocus={() => onPreviewOwner(o.name)}
+                    onBlur={() => onPreviewOwner(null)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         onSelectOwner(active ? null : o.name);
                       }
                     }}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : ""}`}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 ${active ? "bg-[#141414] text-white" : "hover:bg-[#f6f4ef]"}`}
                   >
                     <OwnerAvatar name={o.name} image={o.image} color={o.color} url={o.url} size={22} />
                     <span className="min-w-0 flex-1 truncate text-[10px] sm:text-[11px]">
