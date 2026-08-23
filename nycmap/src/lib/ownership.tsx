@@ -6,6 +6,7 @@ import { OwnedBlock } from "@/types";
 interface OwnershipContextType {
   ownedBlocks: OwnedBlock[];
   purchaseBlock: (block: OwnedBlock) => void;
+  refreshClaims: () => Promise<void>;
   getBlockOwner: (blockId: string) => OwnedBlock | undefined;
   getBlocksForNeighborhood: (neighborhoodId: string) => OwnedBlock[];
   getTotalRevenue: () => number;
@@ -34,10 +35,25 @@ export function OwnershipProvider({ children }: { children: React.ReactNode }) {
   const [ownedBlocks, setOwnedBlocks] = useState<OwnedBlock[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const refreshClaims = useCallback(async () => {
+    try {
+      const res = await fetch("/api/claims", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { claims?: OwnedBlock[] };
+      if (Array.isArray(data.claims)) {
+        setOwnedBlocks(data.claims);
+        save(data.claims);
+      }
+    } catch {
+      /* keep cached claims */
+    }
+  }, []);
+
   useEffect(() => {
     setOwnedBlocks(load());
     setLoaded(true);
-  }, []);
+    void refreshClaims();
+  }, [refreshClaims]);
 
   const purchaseBlock = useCallback((block: OwnedBlock) => {
     setOwnedBlocks((prev) => {
@@ -81,6 +97,7 @@ export function OwnershipProvider({ children }: { children: React.ReactNode }) {
       value={{
         ownedBlocks,
         purchaseBlock,
+        refreshClaims,
         getBlockOwner,
         getBlocksForNeighborhood,
         getTotalRevenue,

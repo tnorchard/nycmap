@@ -45,7 +45,7 @@ export default function HowItWorks({ open, onClose }: Props) {
 
         <p className="mt-6 text-[11px] leading-relaxed text-[#8a847e]">
           Not affiliated with the City of New York. Blocks are digital souvenirs on this map,
-          not real property. Payments are simulated in this preview.
+          not real property. Checkout is billed by SportBusy LLC as NYC MAP.
         </p>
 
         <button

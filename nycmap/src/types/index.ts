@@ -36,4 +36,5 @@ export interface OwnedBlock {
   ownerColor: string;
   price: number;
   purchasedAt: string;
+  stripeSessionId?: string;
 }

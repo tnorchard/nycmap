@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { BlockProperties, OwnedBlock } from "@/types";
-import { useOwnership } from "@/lib/ownership";
 import { formatMoney, minOutbid } from "@/lib/pricing";
 
 const COLORS = ["#141414", "#8B1E3F", "#1F4E5F", "#C45C26", "#2F5D50", "#3D348B", "#B08900"];
@@ -22,8 +21,7 @@ export default function PurchaseModal({ block, owner, onClose }: Props) {
   const [color, setColor] = useState(COLORS[0]);
   const [bidAmount, setBidAmount] = useState(String(minBid));
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-  const { purchaseBlock } = useOwnership();
+  const [error, setError] = useState("");
 
   const bid = Number(bidAmount) || 0;
   const isValid = name.trim() && url.trim() && bid >= minBid;
@@ -31,37 +29,41 @@ export default function PurchaseModal({ block, owner, onClose }: Props) {
   const handlePurchase = async () => {
     if (!isValid) return;
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 700));
+    setError("");
     const href = url.trim().startsWith("http") ? url.trim() : `https://${url.trim()}`;
-    purchaseBlock({
-      id: block.id,
-      taxBlock: block.block,
-      neighborhoodId: block.neighborhoodId,
-      neighborhoodName: block.neighborhood,
-      ownerName: name.trim(),
-      ownerUrl: href,
-      ownerImage: image.trim(),
-      ownerColor: color,
-      price: bid,
-      purchasedAt: new Date().toISOString(),
-    });
-    setBusy(false);
-    setDone(true);
-    setTimeout(onClose, 1200);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blockId: block.id,
+          taxBlock: block.block,
+          neighborhoodId: block.neighborhoodId,
+          neighborhoodName: block.neighborhood,
+          borough: block.borough,
+          ownerName: name.trim(),
+          ownerUrl: href,
+          ownerImage: image.trim(),
+          ownerColor: color,
+          bid,
+          basePrice: block.price,
+        }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Checkout failed");
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Checkout failed");
+      setBusy(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-end justify-center bg-black/25 p-4 backdrop-blur-sm sm:items-center">
       <div className="claim-sheet w-full max-w-md overflow-hidden rounded-3xl border border-[#e4e0d8] bg-white shadow-2xl">
-        {done ? (
-          <div className="px-8 py-12 text-center">
-            <p className="font-serif text-2xl text-[#141414]">You own this block.</p>
-            <p className="mt-2 text-[13px] text-[#6b6560]">
-              {block.neighborhood} · MN-{block.block}
-            </p>
-          </div>
-        ) : (
-          <>
+        <>
             <div className="flex items-start justify-between border-b border-[#eeeae3] px-6 py-5">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-[#8a847e]">
@@ -120,12 +122,14 @@ export default function PurchaseModal({ block, owner, onClose }: Props) {
                 disabled={!isValid || busy}
                 className="w-full rounded-2xl bg-[#141414] py-3 text-[13px] font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-30"
               >
-                {busy ? "Recording deed…" : isOwned ? `Takeover for ${formatMoney(bid)}` : `Claim for ${formatMoney(bid)}`}
+                {busy ? "Sending you to Stripe…" : isOwned ? `Takeover for ${formatMoney(bid)}` : `Claim for ${formatMoney(bid)}`}
               </button>
-              <p className="mt-2 text-center text-[10px] text-[#8a847e]">Preview — no real charge yet</p>
+              {error ? <p className="mt-2 text-center text-[11px] text-[#8B1E3F]">{error}</p> : null}
+              <p className="mt-2 text-center text-[10px] text-[#8a847e]">
+                Stripe Checkout · billed as NYC MAP by SportBusy LLC · test mode
+              </p>
             </div>
           </>
-        )}
       </div>
     </div>
   );
